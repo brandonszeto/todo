@@ -3,7 +3,6 @@ Cargo.lock
 *.swp
 .lib.rs.swp
 choose.log
-/src/main.rs
 /doc
 /src/\#lib.rs\#
 *.d
