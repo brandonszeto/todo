@@ -3,13 +3,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Result;
 use std::io;
 use std::io::{stdout, Write};
-use clap::{
-    Args,
-    Parser,
-    Subcommand
-}
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Project {
     id: String,
     name: String,
@@ -25,7 +20,7 @@ struct Project {
     url: String,
 }
 
-fn list_projects() {}
+fn list_projects(api: String) {}
 
 fn create_project() {}
 
