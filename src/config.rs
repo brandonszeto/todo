@@ -2,7 +2,7 @@ use anyhow::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
-    io::stdin,
+    io::{stdin, Write},
     path::{Path, PathBuf},
 };
 
@@ -56,9 +56,6 @@ impl UserConfig {
         }
     }
 
-    // Loads api token from cache or config, requests if not found
-    pub fn load_config() {}
-
     // Requests and saves user input api token
     pub fn get_api_token() -> Result<String> {
         let mut input_api = String::new();
@@ -94,6 +91,41 @@ impl UserConfig {
                 format!("invalid length: {} (must be {})", token.len(), EXPECTED_LEN,),
             )))
         } else {
+            Ok(())
+        }
+    }
+
+    pub fn load_config(&mut self) -> Result<()> {
+        let paths = self.get_config_path()?;
+        if paths.config_file_path.exists() {
+            let config_string = fs::read_to_string(&paths.config_file_path)?;
+            let config_json: UserConfig = serde_json::from_str(&config_string)?;
+
+            self.token = config_json.token;
+            self.color = config_json.color;
+
+            Ok(())
+        } else {
+            // Create and save config file to new path
+            println!(
+                "Config will be saved to {}",
+                paths.config_file_path.display()
+            );
+
+            let token = UserConfig::get_api_token()?;
+
+            let color = true;
+
+            let config_json = UserConfig { token, color };
+
+            let content_json = serde_json::to_string(&config_json)?;
+
+            let mut new_config = fs::File::create(&paths.config_file_path)?;
+            write!(new_config, "{}", content_json)?;
+
+            self.token = config_json.token;
+            self.color = config_json.color;
+
             Ok(())
         }
     }
