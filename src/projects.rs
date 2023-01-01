@@ -1,3 +1,4 @@
+use crate::UserConfig;
 use curl::easy::{Easy, List};
 use serde::{Deserialize, Serialize};
 use serde_json::Result;
@@ -20,8 +21,31 @@ struct Project {
     url: String,
 }
 
-fn list_projects(api: String) {}
+pub fn list_projects() {
+    let mut easy = Easy::new();
+    easy.url("https://api.todoist.com/rest/v2/projects")
+        .unwrap();
+    let mut list = List::new();
+    let authorization_str = String::from("Authorization: Bearer ").to_owned();
+    let mut client_config = UserConfig::new();
+    client_config.load_config().unwrap();
+    let token = client_config.token.to_owned();
+    let authorization_str = authorization_str + &token;
+    list.append(&authorization_str).unwrap();
+    easy.http_headers(list).unwrap();
+    easy.write_function(|data| {
+        stdout().write_all(data).unwrap();
+        Ok(data.len())
+    })
+    .unwrap();
 
-fn create_project() {}
+    easy.perform().unwrap();
+}
 
-fn list_projects() {}
+fn create_project(project_name: &String) {}
+
+fn update_project(project_name: &String) {}
+
+fn delete_project(project_name: &String) {}
+
+fn get_project_collaborators() {}

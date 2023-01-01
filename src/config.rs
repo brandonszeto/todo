@@ -28,6 +28,7 @@ impl UserConfig {
         }
     }
 
+    // Gets path for todo config file
     pub fn get_config_path(&self) -> Result<ConfigPath> {
         match dirs::home_dir() {
             Some(home) => {
@@ -63,23 +64,11 @@ impl UserConfig {
         stdin().read_line(&mut input_api).unwrap();
         input_api = input_api.trim().to_string();
 
-        // Make sure the inut api token is valid
+        // Validate api token
         match UserConfig::validate_api_token(&input_api) {
             Ok(_) => return Ok(input_api),
             Err(e) => return Err(e),
         }
-
-        // let p = UserConfig {
-        //     token: input_api,
-        //     color: true,
-        // };
-
-        // let serialized = serde_json::to_string(&p).unwrap();
-        // // return serialized;
-        // println!("serialized = {}", serialized);
-
-        // let deserialized: UserConfig = serde_json::from_str(&serialized).unwrap();
-        // println!("deserialized = {:?}", deserialized);
     }
 
     // TODO: Strengthen validation by test project get
@@ -95,6 +84,7 @@ impl UserConfig {
         }
     }
 
+    // Loads preexisting config file
     pub fn load_config(&mut self) -> Result<()> {
         let paths = self.get_config_path()?;
         if paths.config_file_path.exists() {
@@ -118,7 +108,7 @@ impl UserConfig {
 
             let config_json = UserConfig { token, color };
 
-            let content_json = serde_json::to_string(&config_json)?;
+            let content_json = serde_json::to_string_pretty(&config_json)?;
 
             let mut new_config = fs::File::create(&paths.config_file_path)?;
             write!(new_config, "{}", content_json)?;
