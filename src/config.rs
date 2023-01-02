@@ -1,8 +1,9 @@
 use anyhow::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     fs,
-    io::{stdin, Write},
+    io::{stdin, Read},
     path::{Path, PathBuf},
 };
 
@@ -14,109 +15,80 @@ const CONFIG_FILE: &str = "config.json";
 pub struct UserConfig {
     pub token: String,
     pub color: bool,
-}
-
-pub struct ConfigPath {
-    pub config_file_path: PathBuf,
+    pub user_projects: HashMap<String, u32>,
+    pub path: PathBuf,
 }
 
 impl UserConfig {
-    pub fn new() -> UserConfig {
-        UserConfig {
-            token: "".to_string(),
+    pub fn new(token: &str) -> Result<UserConfig> {
+        let user_projects: HashMap<String, u32> = HashMap::new();
+        Ok(UserConfig {
+            token: String::from(token),
             color: true,
-        }
+            user_projects,
+            path: get_path().unwrap(),
+        })
     }
 
-    // Gets path for todo config file
-    pub fn get_config_path(&self) -> Result<ConfigPath> {
-        match dirs::home_dir() {
-            Some(home) => {
-                let home_path = Path::new(&home);
-                let config_dir = home_path.join(CONFIG_DIR);
-                let app_config_dir = config_dir.join(APP_CONFIG_DIR);
-                if !config_dir.exists() {
-                    fs::create_dir(&config_dir)?;
-                }
+    pub fn load_config(path: &str) -> Result<UserConfig, String> {
+        let mut json = String::new();
 
-                if !app_config_dir.exists() {
-                    fs::create_dir(&app_config_dir)?;
-                }
+        fs::File::open(path)
+            .or(Err("Could not find file"))?
+            .read_to_string(&mut json)
+            .or(Err("Could not read to string"))?;
 
-                let config_file_path = &app_config_dir.join(CONFIG_FILE);
+        serde_json::from_str::<UserConfig>(&json).map_err(|_| String::from("Could not parse JSON"))
+    }
+}
 
-                let final_path = ConfigPath {
-                    config_file_path: config_file_path.to_path_buf(),
-                };
-                Ok(final_path)
+// Requests and saves user input api token
+pub fn get_api_token() -> Result<String> {
+    let mut input_api = String::new();
+    println!("Please enter your api token:");
+    stdin().read_line(&mut input_api).unwrap();
+    input_api = input_api.trim().to_string();
+
+    // Validate api token
+    match validate_api_token(&input_api) {
+        Ok(_) => return Ok(input_api),
+        Err(e) => return Err(e),
+    }
+}
+
+pub fn validate_api_token(token: &str) -> Result<()> {
+    const EXPECTED_LEN: usize = 40;
+    if token.len() != EXPECTED_LEN {
+        Err(Error::from(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("invalid length: {} (must be {})", token.len(), EXPECTED_LEN,),
+        )))
+    } else {
+        Ok(())
+    }
+}
+
+pub fn get_path() -> Result<PathBuf> {
+    match dirs::home_dir() {
+        Some(home) => {
+            let home_path = Path::new(&home);
+            let config_dir = home_path.join(CONFIG_DIR);
+            let app_config_dir = config_dir.join(APP_CONFIG_DIR);
+            if !config_dir.exists() {
+                fs::create_dir(&config_dir)?;
             }
-            None => Err(Error::from(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("No $HOME directory found for config file"),
-            ))),
+
+            if !app_config_dir.exists() {
+                fs::create_dir(&app_config_dir)?;
+            }
+
+            let config_file_path = &app_config_dir.join(CONFIG_FILE);
+
+            Ok(config_file_path.to_path_buf())
         }
-    }
-
-    // Requests and saves user input api token
-    pub fn get_api_token() -> Result<String> {
-        let mut input_api = String::new();
-        println!("Please enter your api token:");
-        stdin().read_line(&mut input_api).unwrap();
-        input_api = input_api.trim().to_string();
-
-        // Validate api token
-        match UserConfig::validate_api_token(&input_api) {
-            Ok(_) => return Ok(input_api),
-            Err(e) => return Err(e),
-        }
-    }
-
-    // TODO: Strengthen validation by test project get
-    fn validate_api_token(token: &str) -> Result<()> {
-        const EXPECTED_LEN: usize = 40;
-        if token.len() != EXPECTED_LEN {
-            Err(Error::from(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!("invalid length: {} (must be {})", token.len(), EXPECTED_LEN,),
-            )))
-        } else {
-            Ok(())
-        }
-    }
-
-    // Loads preexisting config file
-    pub fn load_config(&mut self) -> Result<()> {
-        let paths = self.get_config_path()?;
-        if paths.config_file_path.exists() {
-            let config_string = fs::read_to_string(&paths.config_file_path)?;
-            let config_json: UserConfig = serde_json::from_str(&config_string)?;
-
-            self.token = config_json.token;
-            self.color = config_json.color;
-
-            Ok(())
-        } else {
-            // Create and save config file to new path
-            println!(
-                "Config will be saved to {}",
-                paths.config_file_path.display()
-            );
-
-            let token = UserConfig::get_api_token()?;
-
-            let color = true;
-
-            let config_json = UserConfig { token, color };
-
-            let content_json = serde_json::to_string_pretty(&config_json)?;
-
-            let mut new_config = fs::File::create(&paths.config_file_path)?;
-            write!(new_config, "{}", content_json)?;
-
-            self.token = config_json.token;
-            self.color = config_json.color;
-
-            Ok(())
-        }
+        None => Err(Error::from(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("No $HOME directory found for config file"),
+        ))),
     }
 }
